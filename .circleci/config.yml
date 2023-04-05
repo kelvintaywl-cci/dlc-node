@@ -1,7 +1,949 @@
 version: 2.1
 
 orbs:
-  aws-ecr: circleci/aws-ecr@8.2.1
+  aws-ecr:
+    version: 2.1
+    description: |
+        Build images and push them to the Amazon Elastic Container Registry.
+    display:
+        home_url: https://aws.amazon.com/ecr/
+        source_url: https://github.com/CircleCI-Public/aws-ecr-orb
+    orbs:
+        aws-cli: circleci/aws-cli@3.1.3
+    commands:
+        build-and-push-image:
+            description: |
+                Install AWS CLI, if needed, and configure. Log into Amazon ECR and push image to repository. Requires environment variables for AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY. We recommend these be saved in a Project (https://circleci.com/docs/2.0/env-vars/#setting-an-environment-variable-in-a-project) or in Contexts (https://circleci.com/docs/2.0/contexts).
+            parameters:
+                assume-web-identity:
+                    default: false
+                    description: Set to true to configure a profile using short-term credentials
+                    type: boolean
+                attach-workspace:
+                    default: false
+                    description: |
+                        Boolean for whether or not to attach to an existing workspace. Default is false.
+                    type: boolean
+                aws-access-key-id:
+                    default: AWS_ACCESS_KEY_ID
+                    description: |
+                        AWS access key id for IAM role. Set this to the name of the environment variable you will set to hold this value, i.e. AWS_ACCESS_KEY_ID.
+                    type: env_var_name
+                aws-cli-version:
+                    default: latest
+                    description: Select a specific version of the AWS v2 CLI. By default the latest version will be used.
+                    type: string
+                aws-secret-access-key:
+                    default: AWS_SECRET_ACCESS_KEY
+                    description: |
+                        AWS secret key for IAM role. Set this to the name of the environment variable you will set to hold this value, i.e. AWS_SECRET_ACCESS_KEY.
+                    type: env_var_name
+                build-path:
+                    default: .
+                    description: Path to the directory containing your build context. Defaults to . (working directory).
+                    type: string
+                checkout:
+                    default: true
+                    description: |
+                        Boolean for whether or not to checkout as a first step. Default is true.
+                    type: boolean
+                create-repo:
+                    default: false
+                    description: Should the repo be created if it does not exist?
+                    type: boolean
+                docker-login:
+                    default: false
+                    description: |
+                        Enable dockerhub authentication. Defaults to false.
+                    type: boolean
+                dockerfile:
+                    default: Dockerfile
+                    description: Name of dockerfile to use. Defaults to Dockerfile.
+                    type: string
+                dockerhub-password:
+                    default: DOCKERHUB_PASSWORD
+                    description: |
+                        Dockerhub password to be configured. Set this to the name of the environment variable you will set to hold this value, i.e. DOCKERHUB_PASSWORD.
+                    type: env_var_name
+                dockerhub-username:
+                    default: DOCKERHUB_USERNAME
+                    description: |
+                        Dockerhub username to be configured. Set this to the name of the environment variable you will set to hold this value, i.e. DOCKERHUB_USERNAME.
+                    type: env_var_name
+                extra-build-args:
+                    default: ""
+                    description: |
+                        Extra flags to pass to docker build. For examples, see https://docs.docker.com/engine/reference/commandline/build
+                    type: string
+                lifecycle-policy-path:
+                    default: ""
+                    description: |
+                        The path to the .json file containing the lifecycle policy to be applied to a specified repository in AWS ECR.
+                    type: string
+                new-profile-name:
+                    default: ""
+                    description: Name of new profile associated with role arn.
+                    type: string
+                no-output-timeout:
+                    default: 10m
+                    description: |
+                        The amount of time to allow the docker build command to run before timing out (default is `10m`)
+                    type: string
+                path:
+                    default: .
+                    description: Path to the directory containing your Dockerfile. Defaults to . (working directory).
+                    type: string
+                platform:
+                    default: linux/amd64
+                    description: Platform targets for the docker image, multi arch images. Ex. linux/amd64,linux/arm64
+                    type: string
+                profile-name:
+                    default: default
+                    description: AWS profile name to be configured.
+                    type: string
+                public-registry:
+                    default: false
+                    description: |
+                        Set to true if building and pushing an image to a Public Registry on ECR.
+                    type: boolean
+                public-registry-alias:
+                    default: ${AWS_ECR_PUBLIC_REGISTRY_ALIAS}
+                    description: |
+                        The public registry alias for your public repositories. This parameter is required if pushing to a public repository It can be found in the Amazon ECR console > Public Registries.
+                    type: string
+                push-image:
+                    default: true
+                    description: Set to false to build an image without pushing to repository.  Defaults to true.
+                    type: boolean
+                region:
+                    default: ${AWS_REGION}
+                    description: |
+                        Name of env var storing your AWS region information, defaults to AWS_REGION
+                    type: string
+                registry-id:
+                    default: AWS_ECR_REGISTRY_ID
+                    description: |
+                        The 12 digit AWS id associated with the ECR account. This field is required
+                    type: env_var_name
+                remote-docker-layer-caching:
+                    default: false
+                    description: |
+                        Enable Docker layer caching if using remote Docker engine. Defaults to false.
+                    type: boolean
+                remote-docker-version:
+                    default: ""
+                    description: Specific remote docker version
+                    type: string
+                repo:
+                    description: Name of an Amazon ECR repository
+                    type: string
+                repo-policy-path:
+                    default: ""
+                    description: |
+                        The path to the .json file containing the repository policy to be applied to a specified repository in AWS ECR.
+                    type: string
+                repo-scan-on-push:
+                    default: true
+                    description: Should the created repo be security scanned on push?
+                    type: boolean
+                role-arn:
+                    default: ""
+                    description: Role ARN that the profile should take.
+                    type: string
+                role-session-name:
+                    default: ${CIRCLE_JOB}
+                    description: An identifier for the assumed role session
+                    type: string
+                session-duration:
+                    default: "3600"
+                    description: The duration of the session in seconds
+                    type: string
+                set-repo-policy:
+                    default: false
+                    description: Should a repository policy be set?
+                    type: boolean
+                setup-remote-docker:
+                    default: false
+                    description: |
+                        Setup and use CircleCI's remote Docker environment for Docker and docker-compose commands? Not required if using the default executor
+                    type: boolean
+                skip-when-tags-exist:
+                    default: false
+                    description: Whether to skip image building if all specified tags already exist in ECR
+                    type: boolean
+                source-profile:
+                    default: default
+                    description: Source profile containing credentials to assume the role with role-arn.
+                    type: string
+                tag:
+                    default: latest
+                    description: |
+                        A comma-separated string containing docker image tags to build and push (default = latest)
+                    type: string
+                workspace-root:
+                    default: .
+                    description: |
+                        Workspace root path that is either an absolute path or a path relative to the working directory. Defaults to '.' (the working directory)
+                    type: string
+            steps:
+                - when:
+                    condition: <<parameters.checkout>>
+                    steps:
+                        - checkout
+                - when:
+                    condition: <<parameters.attach-workspace>>
+                    steps:
+                        - attach_workspace:
+                            at: <<parameters.workspace-root>>
+                - when:
+                    condition:
+                        and:
+                            - <<parameters.remote-docker-layer-caching>>
+                            - not: <<parameters.setup-remote-docker>>
+                    steps:
+                        - run: echo "Docker Layer Caching requires Setup Remote Docker command" && exit 1
+                - when:
+                    condition: <<parameters.setup-remote-docker>>
+                    steps:
+                        - setup_remote_docker:
+                            docker_layer_caching: <<parameters.remote-docker-layer-caching>>
+                            version: <<parameters.remote-docker-version>>
+                - build-image:
+                    build-path: <<parameters.build-path>>
+                    dockerfile: <<parameters.dockerfile>>
+                    extra-build-args: <<parameters.extra-build-args>>
+                    lifecycle-policy-path: <<parameters.lifecycle-policy-path>>
+                    no-output-timeout: <<parameters.no-output-timeout>>
+                    path: <<parameters.path>>
+                    platform: <<parameters.platform>>
+                    profile-name: <<parameters.profile-name>>
+                    public-registry: <<parameters.public-registry>>
+                    public-registry-alias: <<parameters.public-registry-alias>>
+                    push-image: <<parameters.push-image>>
+                    region: <<parameters.region>>
+                    registry-id: <<parameters.registry-id>>
+                    repo: <<parameters.repo>>
+                    skip-when-tags-exist: <<parameters.skip-when-tags-exist>>
+                    tag: <<parameters.tag>>
+        build-image:
+            description: Build a docker image with Docker Buildx
+            parameters:
+                build-path:
+                    default: .
+                    description: Path to the directory containing your build context. Defaults to . (working directory).
+                    type: string
+                dockerfile:
+                    default: Dockerfile
+                    description: Name of dockerfile to use. Defaults to Dockerfile.
+                    type: string
+                extra-build-args:
+                    default: ""
+                    description: |
+                        Extra flags to pass to docker build. For examples, see https://docs.docker.com/engine/reference/commandline/buildx
+                    type: string
+                lifecycle-policy-path:
+                    default: ""
+                    description: |
+                        The path to the .json file containing the lifecycle policy to be applied to a specified repository in AWS ECR.
+                    type: string
+                no-output-timeout:
+                    default: 10m
+                    description: The amount of time to allow the docker command to run before timing out.
+                    type: string
+                path:
+                    default: .
+                    description: Path to the directory containing your Dockerfile. Defaults to . (working directory).
+                    type: string
+                platform:
+                    default: linux/amd64
+                    description: Platform targets for the docker image, multi arch images. Ex. linux/amd64,linux/arm64.
+                    type: string
+                profile-name:
+                    default: default
+                    description: |
+                        AWS profile name to be configured. Only required when skip-when-tags-exist or ecr-login are set to true.
+                    type: string
+                public-registry:
+                    default: false
+                    description: Set to true if building and pushing an image to a Public Registry on ECR.
+                    type: boolean
+                public-registry-alias:
+                    default: ${AWS_ECR_PUBLIC_REGISTRY_ALIAS}
+                    description: |
+                        The public registry alias for your public repositories. This parameter is required if pushing to a public repository It can be found in the Amazon ECR console > Public Registries.
+                    type: string
+                push-image:
+                    default: true
+                    description: Set to false to build an image without pushing to repository.  Defaults to true.
+                    type: boolean
+                region:
+                    default: ${AWS_REGION}
+                    description: |
+                        AWS region of ECR repository. Defaults to environment variable ${AWS_REGION}
+                    type: string
+                registry-id:
+                    default: AWS_ECR_REGISTRY_ID
+                    description: |
+                        The 12 digit AWS Registry ID associated with the ECR account. This field is required
+                    type: env_var_name
+                repo:
+                    description: Name of an Amazon ECR repository
+                    type: string
+                skip-when-tags-exist:
+                    default: false
+                    description: Whether to skip image building if all specified tags already exist in ECR
+                    type: boolean
+                tag:
+                    default: latest
+                    description: A comma-separated string containing docker image tags (default = latest)
+                    type: string
+            steps:
+                - run:
+                    command: "#!/bin/bash\nORB_EVAL_REGION=$(eval echo \"${ORB_EVAL_REGION}\")\nORB_EVAL_REPO=$(eval echo \"${ORB_EVAL_REPO}\")\nORB_EVAL_TAG=$(eval echo \"${ORB_EVAL_TAG}\")\nORB_EVAL_PATH=$(eval echo \"${ORB_EVAL_PATH}\")\nORB_VAL_ACCOUNT_URL=\"${!ORB_ENV_REGISTRY_ID}.dkr.ecr.${ORB_EVAL_REGION}.amazonaws.com\"\nORB_EVAL_PUBLIC_REGISTRY_ALIAS=$(eval echo \"${ORB_EVAL_PUBLIC_REGISTRY_ALIAS}\")\nORB_EVAL_EXTRA_BUILD_ARGS=$(eval echo \"${ORB_EVAL_EXTRA_BUILD_ARGS}\")\nORB_EVAL_BUILD_PATH=$(eval echo \"${ORB_EVAL_BUILD_PATH}\")\nECR_COMMAND=\"ecr\"\nnumber_of_tags_in_ecr=0\n\nIFS=', ' read -ra platform \\<<<\"${ORB_VAL_PLATFORM}\"\nnumber_of_platforms=\"${#platform[@]}\"\n\nif [ -z \"${!ORB_ENV_REGISTRY_ID}\" ]; then\n  echo \"The registry ID is not found. Please add the registry ID as an environment variable in CicleCI before continuing.\"\n  exit 1\nfi\n\nif [ \"${ORB_VAL_PUBLIC_REGISTRY}\" == \"1\" ]; then\n  ECR_COMMAND=\"ecr-public\"\n  ORB_VAL_ACCOUNT_URL=\"public.ecr.aws/${ORB_EVAL_PUBLIC_REGISTRY_ALIAS}\"\nfi\n\nIFS=\",\" read -ra DOCKER_TAGS \\<<<\"${ORB_EVAL_TAG}\"\nfor tag in \"${DOCKER_TAGS[@]}\"; do\n  if [ \"${ORB_VAL_SKIP_WHEN_TAGS_EXIST}\" = \"1\" ] || [ \"${ORB_VAL_SKIP_WHEN_TAGS_EXIST}\" = \"true\" ]; then\n    docker_tag_exists_in_ecr=$(aws \"${ECR_COMMAND}\" describe-images --profile \"${ORB_VAL_PROFILE_NAME}\" --registry-id \"${!ORB_ENV_REGISTRY_ID}\" --region \"${ORB_EVAL_REGION}\" --repository-name \"${ORB_EVAL_REPO}\" --query \"contains(imageDetails[].imageTags[], '${tag}')\")\n    if [ \"${docker_tag_exists_in_ecr}\" = \"true\" ]; then\n      docker pull \"${ORB_VAL_ACCOUNT_URL}/${ORB_EVAL_REPO}:${tag}\"\n      number_of_tags_in_ecr=$((number_of_tags_in_ecr += 1))\n    fi\n  fi\n  docker_tag_args=\"${docker_tag_args} -t ${ORB_VAL_ACCOUNT_URL}/${ORB_EVAL_REPO}:${tag}\"\ndone\n\nif [ \"${ORB_VAL_SKIP_WHEN_TAGS_EXIST}\" = \"0\" ] || [[ \"${ORB_VAL_SKIP_WHEN_TAGS_EXIST}\" = \"1\" && ${number_of_tags_in_ecr} -lt ${#DOCKER_TAGS[@]} ]]; then\n  if [ \"${ORB_VAL_PUSH_IMAGE}\" == \"1\" ]; then\n    set -- \"$@\" --push\n\n    if [ -n \"${ORB_VAL_LIFECYCLE_POLICY_PATH}\" ]; then\n      aws ecr put-lifecycle-policy \\\n        --repository-name \"${ORB_EVAL_REPO}\" \\\n        --lifecycle-policy-text \"file://${ORB_VAL_LIFECYCLE_POLICY_PATH}\"\n    fi\n\n  else\n    set -- \"$@\" --load\n  fi\n\n  if [ \"${number_of_platforms}\" -gt 1 ]; then\n    # In order to build multi-architecture images, a context with binfmt installed must be used. \n    # However, Docker Layer Caching with multi-architecture builds is not currently supported\n\n    if ! docker context ls | grep builder; then\n      # We need to skip the creation of the builder context if it's already present\n      # otherwise the command will fail when called more than once in the same job.\n      docker context create builder\n      docker run --privileged --rm tonistiigi/binfmt --install all\n      docker --context builder buildx create --use\n    fi\n    context_args=\"--context builder\"\n    echo -e \"\\n \\n WARNING: Docker Layer Caching is currently not supported for multi-architecture image builds. \\n \\n\"\n  fi \n  \n  set -x\n  docker \\\n    ${context_args:+$context_args} \\\n    buildx build \\\n    -f \"${ORB_EVAL_PATH}\"/\"${ORB_VAL_DOCKERFILE}\" \\\n    ${docker_tag_args:+$docker_tag_args} \\\n    --platform \"${ORB_VAL_PLATFORM}\" \\\n    --progress plain \\\n    \"$@\" \\\n    ${ORB_EVAL_EXTRA_BUILD_ARGS:+$ORB_EVAL_EXTRA_BUILD_ARGS} \\\n    \"${ORB_EVAL_BUILD_PATH}\"\n  set +x\n  \nfi\n"
+                    environment:
+                        ORB_ENV_REGISTRY_ID: <<parameters.registry-id>>
+                        ORB_EVAL_BUILD_PATH: <<parameters.build-path>>
+                        ORB_EVAL_EXTRA_BUILD_ARGS: <<parameters.extra-build-args>>
+                        ORB_EVAL_PATH: <<parameters.path>>
+                        ORB_EVAL_PUBLIC_REGISTRY_ALIAS: <<parameters.public-registry-alias>>
+                        ORB_EVAL_REGION: <<parameters.region>>
+                        ORB_EVAL_REPO: << parameters.repo >>
+                        ORB_EVAL_TAG: << parameters.tag >>
+                        ORB_VAL_DOCKERFILE: <<parameters.dockerfile>>
+                        ORB_VAL_LIFECYCLE_POLICY_PATH: <<parameters.lifecycle-policy-path>>
+                        ORB_VAL_PLATFORM: <<parameters.platform>>
+                        ORB_VAL_PROFILE_NAME: <<parameters.profile-name>>
+                        ORB_VAL_PUBLIC_REGISTRY: <<parameters.public-registry>>
+                        ORB_VAL_PUSH_IMAGE: <<parameters.push-image>>
+                        ORB_VAL_SKIP_WHEN_TAGS_EXIST: <<parameters.skip-when-tags-exist>>
+                    name: Build Docker Image with buildx
+                    no_output_timeout: <<parameters.no-output-timeout>>
+        create-repo:
+            description: Create a new AWS ECR repository.
+            parameters:
+                profile-name:
+                    default: default
+                    description: AWS profile name to be configured.
+                    type: string
+                public-registry:
+                    default: false
+                    description: Set to true if building and pushing an image to a Public Registry on ECR.
+                    type: boolean
+                region:
+                    default: ${AWS_REGION}
+                    description: |
+                        AWS region of ECR repository. Defaults to environment variable ${AWS_REGION}
+                    type: string
+                repo:
+                    description: Name of an Amazon ECR repository
+                    type: string
+                repo-scan-on-push:
+                    default: true
+                    description: Should the created repo be security scanned on push?
+                    type: boolean
+            steps:
+                - run:
+                    command: |
+                        #!/bin/bash
+                        ORB_EVAL_REGION=$(eval echo "${ORB_EVAL_REGION}")
+                        ORB_EVAL_REPO=$(eval echo "${ORB_EVAL_REPO}")
+
+                        if [ "$ORB_VAL_PUBLIC_REGISTRY" == "1" ]; then
+                            aws ecr-public describe-repositories --profile "${ORB_EVAL_PROFILE_NAME}" --region us-east-1 --repository-names "${ORB_EVAL_REPO}" >/dev/null 2>&1 ||
+                                aws ecr-public create-repository --profile "${ORB_EVAL_PROFILE_NAME}" --region us-east-1 --repository-name "${ORB_EVAL_REPO}"
+                        else
+                            aws ecr describe-repositories --profile "${ORB_VAL_PROFILE_NAME}" --region "${ORB_EVAL_REGION}" --repository-names "${ORB_EVAL_REPO}" >/dev/null 2>&1 ||
+                                if [ "$ORB_VAL_REPO_SCAN_ON_PUSH" == "1" ]; then
+                                    aws ecr create-repository --profile "${ORB_VAL_PROFILE_NAME}" --region "${ORB_EVAL_REGION}" --repository-name "${ORB_EVAL_REPO}" --image-scanning-configuration scanOnPush=true
+                                else
+                                    aws ecr create-repository --profile "${ORB_VAL_PROFILE_NAME}" --region "${ORB_EVAL_REGION}" --repository-name "${ORB_EVAL_REPO}" --image-scanning-configuration scanOnPush=false
+                                fi
+                        fi
+                    environment:
+                        ORB_EVAL_REGION: <<parameters.region>>
+                        ORB_EVAL_REPO: <<parameters.repo>>
+                        ORB_VAL_PROFILE_NAME: <<parameters.profile-name>>
+                        ORB_VAL_PUBLIC_REGISTRY: <<parameters.public-registry>>
+                        ORB_VAL_REPO_SCAN_ON_PUSH: <<parameters.repo-scan-on-push>>
+                    name: Create Repository
+        ecr-login:
+            description: Authenticate into the Amazon ECR service
+            parameters:
+                assume-web-identity:
+                    default: false
+                    description: Set to true to configure a profile using short-term credentials
+                    type: boolean
+                aws-access-key-id:
+                    default: AWS_ACCESS_KEY_ID
+                    description: |
+                        AWS access key id for IAM role. Set this to the name of the environment variable you will set to hold this value, i.e. AWS_ACCESS_KEY.
+                    type: env_var_name
+                aws-cli-version:
+                    default: latest
+                    description: Select a specific version of the AWS v2 CLI. By default the latest version will be used.
+                    type: string
+                aws-secret-access-key:
+                    default: AWS_SECRET_ACCESS_KEY
+                    description: |
+                        AWS secret key for IAM role. Set this to the name of the environment variable you will set to hold this value, i.e. AWS_SECRET_ACCESS_KEY.
+                    type: env_var_name
+                new-profile-name:
+                    default: ""
+                    description: Name of new profile associated with role arn.
+                    type: string
+                profile-name:
+                    default: default
+                    description: |
+                        AWS profile name to be configured.
+                    type: string
+                public-registry:
+                    default: false
+                    description: Set to true if building and pushing an image to a Public Registry on ECR.
+                    type: boolean
+                region:
+                    default: ${AWS_REGION}
+                    description: |
+                        AWS region of ECR repository. Defaults to environment variable ${AWS_REGION}
+                    type: string
+                registry-id:
+                    default: AWS_ECR_REGISTRY_ID
+                    description: |
+                        The 12 digit AWS id associated with the ECR account. This field is required
+                    type: env_var_name
+                role-arn:
+                    default: ""
+                    description: Role ARN that the profile should take.
+                    type: string
+                role-session-name:
+                    default: ${CIRCLE_JOB}
+                    description: An identifier for the assumed role session
+                    type: string
+                session-duration:
+                    default: "3600"
+                    description: The duration of the session in seconds
+                    type: string
+                source-profile:
+                    default: default
+                    description: Source profile containing credentials to assume the role with role-arn.
+                    type: string
+            steps:
+                - when:
+                    condition: <<parameters.assume-web-identity>>
+                    steps:
+                        - aws-cli/setup:
+                            profile-name: <<parameters.profile-name>>
+                            role-arn: <<parameters.role-arn>>
+                            role-session-name: <<parameters.role-session-name>>
+                            session-duration: <<parameters.session-duration>>
+                            version: <<parameters.aws-cli-version>>
+                - when:
+                    condition:
+                        not: <<parameters.assume-web-identity>>
+                    steps:
+                        - aws-cli/setup:
+                            aws-access-key-id: <<parameters.aws-access-key-id>>
+                            aws-secret-access-key: <<parameters.aws-secret-access-key>>
+                            profile-name: <<parameters.profile-name>>
+                            version: <<parameters.aws-cli-version>>
+                - when:
+                    condition:
+                        and:
+                            - <<parameters.role-arn>>
+                            - <<parameters.source-profile>>
+                            - <<parameters.new-profile-name>>
+                    steps:
+                        - aws-cli/role-arn-setup:
+                            profile-name: <<parameters.new-profile-name>>
+                            role-arn: <<parameters.role-arn>>
+                            source-profile: <<parameters.source-profile>>
+                - when:
+                    condition:
+                        and:
+                            - <<parameters.role-arn>>
+                            - <<parameters.new-profile-name>>
+                    steps:
+                        - run:
+                            command: |
+                                #!/bin/bash
+                                ORB_EVAL_REGION=$(eval echo "${ORB_EVAL_REGION}")
+                                ORB_VAL_ACCOUNT_URL="${!ORB_ENV_REGISTRY_ID}.dkr.ecr.${ORB_EVAL_REGION}.amazonaws.com"
+                                ECR_COMMAND="ecr"
+
+                                if [ -z "${!ORB_ENV_REGISTRY_ID}" ]; then
+                                  echo "The registry ID is not found. Please add the registry ID as an environment variable in CicleCI before continuing."
+                                  exit 1
+                                fi
+
+                                if [ "$ORB_VAL_PUBLIC_REGISTRY" == "1" ]; then
+                                    ORB_EVAL_REGION="us-east-1"
+                                    ORB_VAL_ACCOUNT_URL="public.ecr.aws"
+                                    ECR_COMMAND="ecr-public"
+                                fi
+
+                                if [ -n "${ORB_VAL_PROFILE_NAME}" ]; then
+                                    set -- "$@" --profile "${ORB_VAL_PROFILE_NAME}"
+                                fi
+
+                                #Shellcheck disable=SC2002
+                                if [ -f "$HOME/.docker/config.json" ] && cat ~/.docker/config.json | grep "${ORB_VAL_ACCOUNT_URL}" > /dev/null 2>&1 ; then
+                                    echo "Credential helper is already installed"
+                                else
+                                    aws "${ECR_COMMAND}" get-login-password --region "${ORB_EVAL_REGION}" "$@" | docker login --username AWS --password-stdin "${ORB_VAL_ACCOUNT_URL}"
+                                fi
+                            environment:
+                                ORB_ENV_REGISTRY_ID: <<parameters.registry-id>>
+                                ORB_EVAL_REGION: <<parameters.region>>
+                                ORB_VAL_PROFILE_NAME: <<parameters.new-profile-name>>
+                                ORB_VAL_PUBLIC_REGISTRY: <<parameters.public-registry>>
+                            name: Log into Amazon ECR with profile <<parameters.new-profile-name>>
+                - unless:
+                    condition:
+                        and:
+                            - <<parameters.role-arn>>
+                            - <<parameters.new-profile-name>>
+                    steps:
+                        - run:
+                            command: |
+                                #!/bin/bash
+                                ORB_EVAL_REGION=$(eval echo "${ORB_EVAL_REGION}")
+                                ORB_VAL_ACCOUNT_URL="${!ORB_ENV_REGISTRY_ID}.dkr.ecr.${ORB_EVAL_REGION}.amazonaws.com"
+                                ECR_COMMAND="ecr"
+
+                                if [ -z "${!ORB_ENV_REGISTRY_ID}" ]; then
+                                  echo "The registry ID is not found. Please add the registry ID as an environment variable in CicleCI before continuing."
+                                  exit 1
+                                fi
+
+                                if [ "$ORB_VAL_PUBLIC_REGISTRY" == "1" ]; then
+                                    ORB_EVAL_REGION="us-east-1"
+                                    ORB_VAL_ACCOUNT_URL="public.ecr.aws"
+                                    ECR_COMMAND="ecr-public"
+                                fi
+
+                                if [ -n "${ORB_VAL_PROFILE_NAME}" ]; then
+                                    set -- "$@" --profile "${ORB_VAL_PROFILE_NAME}"
+                                fi
+
+                                #Shellcheck disable=SC2002
+                                if [ -f "$HOME/.docker/config.json" ] && cat ~/.docker/config.json | grep "${ORB_VAL_ACCOUNT_URL}" > /dev/null 2>&1 ; then
+                                    echo "Credential helper is already installed"
+                                else
+                                    aws "${ECR_COMMAND}" get-login-password --region "${ORB_EVAL_REGION}" "$@" | docker login --username AWS --password-stdin "${ORB_VAL_ACCOUNT_URL}"
+                                fi
+                            environment:
+                                ORB_ENV_REGISTRY_ID: <<parameters.registry-id>>
+                                ORB_EVAL_REGION: <<parameters.region>>
+                                ORB_VAL_PROFILE_NAME: <<parameters.profile-name>>
+                                ORB_VAL_PUBLIC_REGISTRY: <<parameters.public-registry>>
+                            name: Log into Amazon ECR with profile <<parameters.profile-name>>
+        push-image:
+            description: Push a container image to the Amazon ECR registry
+            parameters:
+                public-registry:
+                    default: false
+                    description: Set to true if building and pushing an image to a Public Registry on ECR.
+                    type: boolean
+                public-registry-alias:
+                    default: ${AWS_ECR_PUBLIC_REGISTRY_ALIAS}
+                    description: |
+                        The public registry alias for your public repositories. This parameter is required if pushing to a public repository It can be found in the Amazon ECR console > Public Registries.
+                    type: string
+                region:
+                    default: ${AWS_REGION}
+                    description: |
+                        AWS region of ECR repository. Defaults to environment variable ${AWS_REGION}
+                    type: string
+                registry-id:
+                    default: AWS_ECR_REGISTRY_ID
+                    description: |
+                        The 12 digit AWS Registry ID associated with the ECR account. This field is required
+                    type: env_var_name
+                repo:
+                    description: Name of an Amazon ECR repository
+                    type: string
+                tag:
+                    default: latest
+                    description: A comma-separated string containing docker image tags (default = latest)
+                    type: string
+            steps:
+                - run:
+                    command: |
+                        #!/bin/bash
+                        ORB_EVAL_REPO=$(eval echo "${ORB_EVAL_REPO}")
+                        ORB_EVAL_TAG=$(eval echo "${ORB_EVAL_TAG}")
+                        ORB_EVAL_REGION=$(eval echo "${ORB_EVAL_REGION}")
+                        ORB_VAL_ACCOUNT_URL="${!ORB_ENV_REGISTRY_ID}.dkr.ecr.${ORB_EVAL_REGION}.amazonaws.com"
+                        ORB_EVAL_PUBLIC_REGISTRY_ALIAS=$(eval echo "${ORB_EVAL_PUBLIC_REGISTRY_ALIAS}")
+
+                        if [ -z "${!ORB_ENV_REGISTRY_ID}" ]; then
+                          echo "The registry ID is not found. Please add the registry ID as an environment variable in CicleCI before continuing."
+                          exit 1
+                        fi
+
+                        if [ "${ORB_VAL_PUBLIC_REGISTRY}" == "1" ]; then
+                          ORB_VAL_ACCOUNT_URL="public.ecr.aws/${ORB_EVAL_PUBLIC_REGISTRY_ALIAS}"
+                        fi
+
+                        IFS="," read -ra DOCKER_TAGS \<<< "${ORB_EVAL_TAG}"
+                        for tag in "${DOCKER_TAGS[@]}"; do
+                            docker push "${ORB_VAL_ACCOUNT_URL}/${ORB_EVAL_REPO}:${tag}"
+                        done
+                    environment:
+                        ORB_ENV_REGISTRY_ID: << parameters.registry-id >>
+                        ORB_EVAL_PUBLIC_REGISTRY_ALIAS: <<parameters.public-registry-alias>>
+                        ORB_EVAL_REGION: << parameters.region >>
+                        ORB_EVAL_REPO: << parameters.repo >>
+                        ORB_EVAL_TAG: << parameters.tag >>
+                        ORB_VAL_PUBLIC_REGISTRY: <<parameters.public-registry>>
+                    name: Push image to AWS ECR
+        set-repo-policy:
+            description: Sets a repository policy on a AWS ECR repository.
+            parameters:
+                profile-name:
+                    default: default
+                    description: AWS profile name to be configured.
+                    type: string
+                public-registry:
+                    default: false
+                    description: Set to true if building and pushing an image to a Public Registry on ECR.
+                    type: boolean
+                region:
+                    default: ${AWS_REGION}
+                    description: |
+                        AWS region of ECR repository. Defaults to environment variable ${AWS_REGION}
+                    type: string
+                repo:
+                    description: Name of an Amazon ECR repository
+                    type: string
+                repo-policy-path:
+                    default: ""
+                    description: |
+                        The path to the .json file containing the repository policy to be applied to a specified repository in AWS ECR.
+                    type: string
+            steps:
+                - run:
+                    command: |
+                        #!/bin/bash
+                        ORB_EVAL_REGION=$(eval echo "${ORB_EVAL_REGION}")
+                        ORB_EVAL_REPO=$(eval echo "${ORB_EVAL_REPO}")
+
+                        if [ "$ORB_VAL_PUBLIC_REGISTRY" == "1" ]; then
+                            echo "set-repository-policy is not supported on public repos"
+                            exit 1
+                        else
+                            aws ecr set-repository-policy \
+                                --profile "${ORB_VAL_PROFILE_NAME}" \
+                                --region "${ORB_EVAL_REGION}" \
+                                --repository-name "${ORB_EVAL_REPO}" \
+                                --policy-text "file://${ORB_VAL_REPO_POLICY_PATH}"
+                        fi
+                    environment:
+                        ORB_EVAL_REGION: <<parameters.region>>
+                        ORB_EVAL_REPO: <<parameters.repo>>
+                        ORB_VAL_PROFILE_NAME: <<parameters.profile-name>>
+                        ORB_VAL_PUBLIC_REGISTRY: <<parameters.public-registry>>
+                        ORB_VAL_REPO_POLICY_PATH: <<parameters.repo-policy-path>>
+                    name: Set Repository Policy
+        tag-image:
+            description: Add a tag to an existing published image
+            parameters:
+                repo:
+                    description: Name of an Amazon ECR repository
+                    type: string
+                source-tag:
+                    description: An existing Docker image tag
+                    type: string
+                target-tag:
+                    default: latest
+                    description: A comma-separated string containing docker image tags (default = latest)
+                    type: string
+            steps:
+                - run:
+                    command: |
+                        #!/bin/bash
+                        ORB_EVAL_REPO=$(eval echo "${ORB_EVAL_REPO}")
+                        ORB_EVAL_SOURCE_TAG=$(eval echo "${ORB_EVAL_SOURCE_TAG}")
+                        ORB_EVAL_TARGET_TAG=$(eval echo "${ORB_EVAL_TARGET_TAG}")
+
+                        # pull the image manifest from ECR
+                        MANIFEST=$(aws ecr batch-get-image --repository-name "${ORB_EVAL_REPO}" --image-ids imageTag="${ORB_EVAL_SOURCE_TAG}" --query 'images[].imageManifest' --output text)
+                        IFS="," read -ra ECR_TAGS \<<<"${ORB_EVAL_TARGET_TAG}"
+                        for tag in "${ECR_TAGS[@]}"; do
+                            aws ecr put-image --repository-name "${ORB_EVAL_REPO}" --image-tag "${tag}" --image-manifest "${MANIFEST}"
+                        done
+                    environment:
+                        ORB_EVAL_REPO: <<parameters.repo>>
+                        ORB_EVAL_SOURCE_TAG: <<parameters.source-tag>>
+                        ORB_EVAL_TARGET_TAG: <<parameters.target-tag>>
+                    name: <<parameters.target-tag>> tag to <<parameters.repo>>:<<parameters.source-tag>>
+    executors:
+        default:
+            description: |
+                CircleCI's Ubuntu-based machine executor VM: https://circleci.com/docs/2.0/executor-types/#using-machine
+            machine:
+                docker_layer_caching: <<parameters.use-docker-layer-caching>>
+                image: <<parameters.image>>
+            parameters:
+                image:
+                    default: ubuntu-2004:202107-02
+                    type: string
+                resource-class:
+                    default: medium
+                    type: string
+                use-docker-layer-caching:
+                    default: false
+                    type: boolean
+            resource_class: <<parameters.resource-class>>
+    jobs:
+        build-and-push-image:
+            description: |
+                Install AWS CLI, if needed, and configure. Log into Amazon ECR and push image to repository. Requires environment variables for AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY. We recommend these be saved in a Project (https://circleci.com/docs/2.0/env-vars/#setting-an-environment-variable-in-a-project) or in Contexts (https://circleci.com/docs/2.0/contexts).
+            executor: << parameters.executor >>
+            parameters:
+                assume-web-identity:
+                    default: false
+                    description: Set to true to configure a profile using short-term credentials
+                    type: boolean
+                attach-workspace:
+                    default: false
+                    description: |
+                        Boolean for whether or not to attach to an existing workspace. Default is false.
+                    type: boolean
+                aws-access-key-id:
+                    default: AWS_ACCESS_KEY_ID
+                    description: |
+                        AWS access key id for IAM role. Set this to the name of the environment variable you will set to hold this value, i.e. AWS_ACCESS_KEY_ID.
+                    type: env_var_name
+                aws-cli-version:
+                    default: latest
+                    description: Select a specific version of the AWS v2 CLI. By default the latest version will be used.
+                    type: string
+                aws-secret-access-key:
+                    default: AWS_SECRET_ACCESS_KEY
+                    description: |
+                        AWS secret key for IAM role. Set this to the name of the environment variable you will set to hold this value, i.e. AWS_SECRET_ACCESS_KEY.
+                    type: env_var_name
+                checkout:
+                    default: true
+                    description: |
+                        Boolean for whether or not to checkout as a first step. Default is true.
+                    type: boolean
+                create-repo:
+                    default: false
+                    description: Should the repo be created if it does not exist?
+                    type: boolean
+                docker-login:
+                    default: false
+                    description: |
+                        Enable dockerhub authentication. Defaults to false.
+                    type: boolean
+                dockerfile:
+                    default: Dockerfile
+                    description: Name of dockerfile to use. Defaults to Dockerfile.
+                    type: string
+                dockerhub-password:
+                    default: DOCKERHUB_PASSWORD
+                    description: |
+                        Dockerhub password to be configured. Set this to the name of the environment variable you will set to hold this value, i.e. DOCKERHUB_PASSWORD.
+                    type: env_var_name
+                dockerhub-username:
+                    default: DOCKERHUB_USERNAME
+                    description: |
+                        Dockerhub username to be configured. Set this to the name of the environment variable you will set to hold this value, i.e. DOCKERHUB_USERNAME.
+                    type: env_var_name
+                executor:
+                    default: default
+                    description: |
+                        Executor to use for this job.
+                    type: executor
+                extra-build-args:
+                    default: ""
+                    description: |
+                        Extra flags to pass to docker build. For examples, see https://docs.docker.com/engine/reference/commandline/build
+                    type: string
+                lifecycle-policy-path:
+                    default: ""
+                    description: |
+                        The path to the .json file containing the lifecycle policy to be applied to a specified repository in AWS ECR.
+                    type: string
+                new-profile-name:
+                    default: ""
+                    description: Name of new profile associated with role arn.
+                    type: string
+                no-output-timeout:
+                    default: 10m
+                    description: |
+                        The amount of time to allow the docker build command to run before timing out. Defaults to '10m'
+                    type: string
+                path:
+                    default: .
+                    description: Path to the directory containing your Dockerfile and build context. Defaults to . (working directory).
+                    type: string
+                platform:
+                    default: linux/amd64
+                    description: Platform targets for the docker image, multi arch images. Ex. linux/amd64,linux/arm64
+                    type: string
+                profile-name:
+                    default: default
+                    description: AWS profile name to be configured.
+                    type: string
+                public-registry:
+                    default: false
+                    description: Set to true if building and pushing an image to a Public Registry on ECR.
+                    type: boolean
+                public-registry-alias:
+                    default: ${AWS_ECR_PUBLIC_REGISTRY_ALIAS}
+                    description: |
+                        The public registry alias for your public repositories. This parameter is required if pushing to a public repository It can be found in the Amazon ECR console > Public Registries.
+                    type: string
+                push-image:
+                    default: true
+                    description: Set to false to build an image without pushing to repository.  Defaults to true.
+                    type: boolean
+                region:
+                    default: ${AWS_REGION}
+                    description: |
+                        AWS region of ECR repository. Defaults to environment variable ${AWS_REGION}
+                    type: string
+                registry-id:
+                    default: AWS_ECR_REGISTRY_ID
+                    description: |
+                        The 12 digit AWS id associated with the ECR account. This field is required
+                    type: env_var_name
+                remote-docker-layer-caching:
+                    default: false
+                    description: |
+                        Enable Docker layer caching if using remote Docker engine. Requires setup-remote-docker to be set to true. Defaults to false.
+                    type: boolean
+                remote-docker-version:
+                    default: ""
+                    description: Specific remote docker version
+                    type: string
+                repo:
+                    description: Name of an Amazon ECR repository
+                    type: string
+                repo-policy-path:
+                    default: ""
+                    description: |
+                        The path to the .json file containing the repository policy to be applied to a specified repository in AWS ECR.
+                    type: string
+                repo-scan-on-push:
+                    default: true
+                    description: Should the created repo be security scanned on push?
+                    type: boolean
+                role-arn:
+                    default: ""
+                    description: Role ARN that the profile should take.
+                    type: string
+                role-session-name:
+                    default: ${CIRCLE_JOB}
+                    description: An identifier for the assumed role session
+                    type: string
+                session-duration:
+                    default: "3600"
+                    description: The duration of the session in seconds
+                    type: string
+                set-repo-policy:
+                    default: false
+                    description: Should a repository policy be set?
+                    type: boolean
+                setup-remote-docker:
+                    default: false
+                    description: |
+                        Setup and use CircleCI's remote Docker environment for Docker and docker-compose commands? Not required if using the default executor
+                    type: boolean
+                skip-when-tags-exist:
+                    default: false
+                    description: Whether to skip image building if all specified tags already exist in ECR
+                    type: boolean
+                source-profile:
+                    default: default
+                    description: Source profile containing credentials to assume the role with role-arn.
+                    type: string
+                tag:
+                    default: latest
+                    description: A comma-separated string containing docker image tags to build and push (default = latest)
+                    type: string
+                workspace-root:
+                    default: .
+                    description: |
+                        Workspace root path that is either an absolute path or a path relative to the working directory. Defaults to '.' (the working directory)
+                    type: string
+            steps:
+                - build-and-push-image:
+                    assume-web-identity: <<parameters.assume-web-identity>>
+                    attach-workspace: <<parameters.attach-workspace>>
+                    aws-access-key-id: <<parameters.aws-access-key-id>>
+                    aws-cli-version: <<parameters.aws-cli-version>>
+                    aws-secret-access-key: <<parameters.aws-secret-access-key>>
+                    checkout: <<parameters.checkout>>
+                    create-repo: <<parameters.create-repo>>
+                    docker-login: <<parameters.docker-login>>
+                    dockerfile: <<parameters.dockerfile>>
+                    dockerhub-password: <<parameters.dockerhub-password>>
+                    dockerhub-username: <<parameters.dockerhub-username>>
+                    extra-build-args: <<parameters.extra-build-args>>
+                    lifecycle-policy-path: <<parameters.lifecycle-policy-path>>
+                    new-profile-name: <<parameters.new-profile-name>>
+                    no-output-timeout: <<parameters.no-output-timeout>>
+                    path: <<parameters.path>>
+                    platform: <<parameters.platform>>
+                    profile-name: <<parameters.profile-name>>
+                    public-registry: <<parameters.public-registry>>
+                    public-registry-alias: <<parameters.public-registry-alias>>
+                    push-image: <<parameters.push-image>>
+                    region: <<parameters.region>>
+                    registry-id: <<parameters.registry-id>>
+                    remote-docker-layer-caching: <<parameters.remote-docker-layer-caching>>
+                    remote-docker-version: <<parameters.remote-docker-version>>
+                    repo: <<parameters.repo>>
+                    repo-policy-path: <<parameters.repo-policy-path>>
+                    repo-scan-on-push: <<parameters.repo-scan-on-push>>
+                    role-arn: <<parameters.role-arn>>
+                    role-session-name: <<parameters.role-session-name>>
+                    session-duration: <<parameters.session-duration>>
+                    set-repo-policy: <<parameters.set-repo-policy>>
+                    setup-remote-docker: <<parameters.setup-remote-docker>>
+                    skip-when-tags-exist: <<parameters.skip-when-tags-exist>>
+                    source-profile: <<parameters.source-profile>>
+                    tag: <<parameters.tag>>
+                    workspace-root: <<parameters.workspace-root>>
+    examples:
+        simple-build-and-push:
+            description: Log into AWS, build and push image to Amazon ECR
+            usage:
+                version: "2.1"
+                orbs:
+                    aws-ecr: circleci/aws-ecr@x.y
+                workflows:
+                    build_and_push_image:
+                        jobs:
+                            - aws-ecr/build-and-push-image:
+                                aws-access-key-id: ACCESS_KEY_ID_ENV_VAR_NAME
+                                aws-cli-version: latest
+                                aws-secret-access-key: SECRET_ACCESS_KEY_ENV_VAR_NAME
+                                context: myContext
+                                create-repo: true
+                                dockerfile: myDockerfile
+                                executor: aws-ecr/default
+                                extra-build-args: --compress
+                                new-profile-name: newProfileName
+                                no-output-timeout: 20m
+                                path: pathToMyDockerfile
+                                platform: linux/amd64
+                                profile-name: myProfileName
+                                public-registry: false
+                                push-image: true
+                                region: AWS_REGION
+                                registry-id: AWS_ECR_REGISTRY_ID
+                                repo: myECRRepository
+                                repo-policy-path: repo-policy.json
+                                repo-scan-on-push: true
+                                role-arn: arn:aws:iam::123456789012:role/testing
+                                set-repo-policy: true
+                                skip-when-tags-exist: false
+                                source-profile: sourceProfileName
+                                tag: latest,myECRRepoTag
 
 executors:
   base:
