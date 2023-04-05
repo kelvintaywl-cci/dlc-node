@@ -1,6 +1,6 @@
 FROM node:18-alpine
 
-WORKDIR /opt/elektralabs
+WORKDIR /opt/dlc-node
 
 ARG VERSION="latest"
 ENV VERSION=$VERSION
