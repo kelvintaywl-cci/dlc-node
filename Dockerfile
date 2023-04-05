@@ -7,3 +7,5 @@ ENV VERSION=$VERSION
 
 COPY yarn.lock .
 COPY package.json .
+
+RUN yarn install
