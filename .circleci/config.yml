@@ -945,6 +945,15 @@ orbs:
                                 source-profile: sourceProfileName
                                 tag: latest,myECRRepoTag
 
+jobs:
+  check-images:
+    docker:
+      - image: cimg/node:18.12.0
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run: docker image ls
+
 executors:
   base:
     docker:
@@ -968,3 +977,6 @@ workflows:
           push-image: false
           post-steps:
             - run: docker image ls
+      - check-images:
+          requires:
+            - build-image
